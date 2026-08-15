@@ -1,6 +1,9 @@
 import os
+import logging
 from flask import Flask, render_template, jsonify, request
 from dotenv import load_dotenv
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from database.db import (
     init_db,
@@ -22,6 +25,13 @@ from services.weather_service import (
     WeatherServiceError
 )
 
+# Configure logging format
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+logger = logging.getLogger(__name__)
+
 # Load environment variables
 load_dotenv()
 
@@ -37,6 +47,22 @@ if not secret_key:
     secret_key = "dev-secret-key-change-in-production"
 
 app.secret_key = secret_key
+
+# Configure Rate Limiting with Flask-Limiter
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=[],  # Rely on explicit route limits
+    storage_uri="memory://"
+)
+
+# Custom Rate Limit Exceeded Error Handler (HTTP 429)
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({
+        "success": False,
+        "error": "Too many requests. Please try again later."
+    }), 429
 
 # Ensure database tables exist on startup
 with app.app_context():
@@ -61,8 +87,9 @@ def health_check():
 
 
 @app.route("/api/weather")
+@limiter.limit("60 per minute")
 def api_current_weather():
-    """Endpoint: GET /api/weather?city=Lahore"""
+    """Endpoint: GET /api/weather?city=Lahore (Rate limited: 60/min)"""
     city = request.args.get("city", "").strip()
     if not city:
         return jsonify({"error": "Please enter a city name."}), 400
@@ -78,12 +105,14 @@ def api_current_weather():
     except WeatherServiceError as exc:
         return jsonify({"error": exc.message}), exc.status_code
     except Exception:
+        logger.exception("Unexpected error in api_current_weather")
         return jsonify({"error": "Weather service is temporarily unavailable. Please try again later."}), 500
 
 
 @app.route("/api/forecast")
+@limiter.limit("60 per minute")
 def api_forecast():
-    """Endpoint: GET /api/forecast?city=Lahore"""
+    """Endpoint: GET /api/forecast?city=Lahore (Rate limited: 60/min)"""
     city = request.args.get("city", "").strip()
     if not city:
         return jsonify({"error": "Please enter a city name."}), 400
@@ -94,12 +123,14 @@ def api_forecast():
     except WeatherServiceError as exc:
         return jsonify({"error": exc.message}), exc.status_code
     except Exception:
+        logger.exception("Unexpected error in api_forecast")
         return jsonify({"error": "Weather service is temporarily unavailable. Please try again later."}), 500
 
 
 @app.route("/api/weather/location")
+@limiter.limit("60 per minute")
 def api_weather_location():
-    """Endpoint: GET /api/weather/location?lat=31.5204&lon=74.3587"""
+    """Endpoint: GET /api/weather/location?lat=31.5204&lon=74.3587 (Rate limited: 60/min)"""
     lat_raw = request.args.get("lat")
     lon_raw = request.args.get("lon")
 
@@ -123,12 +154,14 @@ def api_weather_location():
     except WeatherServiceError as exc:
         return jsonify({"error": exc.message}), exc.status_code
     except Exception:
+        logger.exception("Unexpected error in api_weather_location")
         return jsonify({"error": "Weather service is temporarily unavailable. Please try again later."}), 500
 
 
 @app.route("/api/forecast/location")
+@limiter.limit("60 per minute")
 def api_forecast_location():
-    """Endpoint: GET /api/forecast/location?lat=31.5204&lon=74.3587"""
+    """Endpoint: GET /api/forecast/location?lat=31.5204&lon=74.3587 (Rate limited: 60/min)"""
     lat_raw = request.args.get("lat")
     lon_raw = request.args.get("lon")
 
@@ -149,6 +182,7 @@ def api_forecast_location():
     except WeatherServiceError as exc:
         return jsonify({"error": exc.message}), exc.status_code
     except Exception:
+        logger.exception("Unexpected error in api_forecast_location")
         return jsonify({"error": "Weather service is temporarily unavailable. Please try again later."}), 500
 
 

@@ -7,6 +7,8 @@ A modern, SaaS-style Weather Dashboard built with **Python 3.12+**, **Flask**, *
 ## 🌟 Features
 
 * **Live Weather Data**: Real-time temperature, condition, feels-like, wind speed/direction, humidity, visibility, pressure, and cloud coverage powered by OpenWeatherMap API.
+* **In-Memory API Caching**: Short-lived server-side response cache reducing redundant external API calls.
+* **API Rate Limiting**: Built-in protection against client-side request flooding (60 requests/minute).
 * **Hourly & 5-Day Forecast**: Clean visual cards for upcoming hourly breakdown and 5-day weather trends.
 * **Interactive Temperature Chart**: Dynamic hourly temperature visualizations using Chart.js.
 * **Search History & Favorites**: Persisted search log and quick-access favorite cities powered by SQLite.
@@ -19,9 +21,32 @@ A modern, SaaS-style Weather Dashboard built with **Python 3.12+**, **Flask**, *
 
 ## 🛠️ Tech Stack
 
-* **Backend**: Python 3.12+, Flask, Requests, SQLite, python-dotenv
+* **Backend**: Python 3.12+, Flask, Requests, SQLite, python-dotenv, Flask-Limiter
 * **Frontend**: HTML5, CSS3 (Vanilla design tokens & grid), Vanilla JavaScript (ES6+), Chart.js
 * **Testing**: Pytest
+
+---
+
+## ⚡ API Caching & Performance
+
+Weather API responses are cached in memory to minimize external API quota usage and improve response latency.
+
+* **Default Cache TTL**: 10 minutes (`600` seconds).
+* **Key Normalization**: Searches for `Lahore`, `lahore`, and `LAHORE` resolve to the same cache key.
+* **Coordinate Normalization**: Coordinates are rounded to 4 decimal places to avoid unnecessary duplicate requests.
+* **Configuration**: Custom cache TTL can be set in `.env`:
+  ```env
+  WEATHER_CACHE_TTL=600
+  ```
+
+---
+
+## 🛡️ Rate Limiting
+
+Weather API endpoints (`/api/weather`, `/api/forecast`, `/api/weather/location`, `/api/forecast/location`) are protected by `Flask-Limiter`.
+
+* **Limit**: 60 requests per minute per client IP address.
+* **Exceeded Rate Limit Response**: HTTP `429 Too Many Requests` with structured JSON error payload.
 
 ---
 
@@ -62,6 +87,7 @@ Edit `.env` and set your configuration:
 WEATHER_API_KEY=your_actual_api_key
 SECRET_KEY=your_actual_secret_key
 FLASK_ENV=development
+WEATHER_CACHE_TTL=600
 ```
 
 > [!IMPORTANT]  
@@ -86,7 +112,7 @@ SQLite is used for local development. Serverless deployment environments such as
 ```text
 weather-dashboard/
 │
-├── app.py                  # Flask application routes and initialization
+├── app.py                  # Flask application routes, rate limiting & initialization
 ├── requirements.txt        # Python package dependencies
 ├── vercel.json             # Vercel serverless deployment config
 ├── .env                    # Environment variables (IGNORED BY GIT)
@@ -98,7 +124,8 @@ weather-dashboard/
 │   └── db.py               # SQLite database helper & migrations
 │
 ├── services/
-│   └── weather_service.py  # OpenWeatherMap API service & normalization
+│   ├── cache_service.py    # In-memory TTL caching engine & key normalizers
+│   └── weather_service.py  # OpenWeatherMap API service, cache integration & normalization
 │
 ├── templates/
 │   └── index.html          # Main HTML dashboard template
@@ -133,8 +160,7 @@ pytest
 ## 🔮 Future Improvements
 
 - PostgreSQL for persistent production storage
-- API response caching
-- Rate limiting
+- Redis for distributed cache storage
 - User authentication
 - More detailed weather analytics
 - Improved deployment infrastructure

@@ -16,8 +16,10 @@ __pycache__/
 .coverage
 
 # Database
-database/*.db
+database/*.db*
 *.db
+*.db-shm
+*.db-wal
 *.sqlite3
 
 # IDEs & OS

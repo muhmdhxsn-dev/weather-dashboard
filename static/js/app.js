@@ -107,6 +107,10 @@ async function searchWeather(cityName) {
             fetch(`/api/forecast?city=${encodeURIComponent(cityName)}`)
         ]);
 
+        if (weatherRes.status === 429 || forecastRes.status === 429) {
+            throw new Error('Too many requests. Please wait a moment and try again.');
+        }
+
         const weatherData = await weatherRes.json();
         const forecastData = await forecastRes.json();
 
@@ -164,6 +168,10 @@ function getCurrentLocation() {
                     fetch(`/api/weather/location?lat=${lat}&lon=${lon}`),
                     fetch(`/api/forecast/location?lat=${lat}&lon=${lon}`)
                 ]);
+
+                if (weatherRes.status === 429 || forecastRes.status === 429) {
+                    throw new Error('Too many requests. Please wait a moment and try again.');
+                }
 
                 const weatherData = await weatherRes.json();
                 const forecastData = await forecastRes.json();

@@ -14,9 +14,13 @@ DB_PATH = DB_DIR / "weather.db"
 
 
 def get_db_connection():
-    """Establish and return a connection to the SQLite database."""
+    """Establish and return a connection to the SQLite database with lock timeout."""
     DB_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=20.0)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+    except sqlite3.OperationalError:
+        pass
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -70,7 +74,7 @@ def add_search_history(city: str, country: str):
         conn.commit()
         conn.close()
     except Exception as exc:
-        print(f"Database write error (search_history): {exc}")
+        print(f"Database write error (add_search_history): {exc}")
 
 
 def get_search_history(limit: int = 8) -> list:
@@ -86,7 +90,7 @@ def get_search_history(limit: int = 8) -> list:
         conn.close()
         return [dict(row) for row in rows]
     except Exception as exc:
-        print(f"Database read error (search_history): {exc}")
+        print(f"Database read error (get_search_history): {exc}")
         return []
 
 

@@ -1,9 +1,20 @@
 import os
+import logging
 from datetime import datetime, timezone, timedelta
 import requests
 from dotenv import load_dotenv
 
+from services.cache_service import (
+    get_cached,
+    set_cached,
+    make_city_cache_key,
+    make_coords_cache_key
+)
+
 load_dotenv()
+
+# Setup module logger
+logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.openweathermap.org/data/2.5"
 
@@ -182,7 +193,6 @@ def parse_forecast(data: dict) -> dict:
     daily = []
     # Take up to 5 consecutive days
     for date_str, bucket in list(daily_buckets.items())[:5]:
-        # Pick daytime/midday icon if available (icons ending in 'd'), else middle icon
         day_icons = [icon for icon in bucket["icons"] if icon.endswith("d")]
         selected_icon = day_icons[len(day_icons) // 2] if day_icons else bucket["icons"][len(bucket["icons"]) // 2]
         selected_condition = bucket["conditions"][len(bucket["conditions"]) // 2]
@@ -215,7 +225,7 @@ def _execute_api_request(url: str, params: dict) -> dict:
         response = requests.get(url, params=params, timeout=8)
     except requests.exceptions.Timeout:
         raise WeatherServiceError("Weather service connection timed out. Please try again.", status_code=504)
-    except requests.exceptions.RequestException as exc:
+    except requests.exceptions.RequestException:
         raise WeatherServiceError("Unable to reach weather service. Check network connection.", status_code=503)
 
     if response.status_code == 200:
@@ -231,10 +241,17 @@ def _execute_api_request(url: str, params: dict) -> dict:
 
 
 def get_current_weather(city: str) -> dict:
-    """Fetch current weather data for a specified city name."""
+    """Fetch current weather data for a specified city name (with caching)."""
     if not city or not city.strip():
         raise WeatherServiceError("Please enter a city name.", status_code=400)
-    
+
+    cache_key = make_city_cache_key("weather", city)
+    cached_data = get_cached(cache_key)
+    if cached_data:
+        logger.info(f"CACHE HIT for key: {cache_key}")
+        return cached_data
+
+    logger.info(f"CACHE MISS for key: {cache_key}")
     api_key = get_api_key()
     url = f"{BASE_URL}/weather"
     params = {
@@ -243,14 +260,25 @@ def get_current_weather(city: str) -> dict:
         "units": "metric"
     }
     raw_data = _execute_api_request(url, params)
-    return parse_current_weather(raw_data)
+    parsed_data = parse_current_weather(raw_data)
+    
+    # Store successful response in cache
+    set_cached(cache_key, parsed_data)
+    return parsed_data
 
 
 def get_forecast(city: str) -> dict:
-    """Fetch 5-day / 3-hour forecast data for a specified city name."""
+    """Fetch 5-day / 3-hour forecast data for a specified city name (with caching)."""
     if not city or not city.strip():
         raise WeatherServiceError("Please enter a city name.", status_code=400)
 
+    cache_key = make_city_cache_key("forecast", city)
+    cached_data = get_cached(cache_key)
+    if cached_data:
+        logger.info(f"CACHE HIT for key: {cache_key}")
+        return cached_data
+
+    logger.info(f"CACHE MISS for key: {cache_key}")
     api_key = get_api_key()
     url = f"{BASE_URL}/forecast"
     params = {
@@ -259,11 +287,21 @@ def get_forecast(city: str) -> dict:
         "units": "metric"
     }
     raw_data = _execute_api_request(url, params)
-    return parse_forecast(raw_data)
+    parsed_data = parse_forecast(raw_data)
+
+    set_cached(cache_key, parsed_data)
+    return parsed_data
 
 
 def get_weather_by_coordinates(lat: float, lon: float) -> dict:
-    """Fetch current weather using latitude and longitude coordinates."""
+    """Fetch current weather using latitude and longitude coordinates (with caching)."""
+    cache_key = make_coords_cache_key("weather", lat, lon)
+    cached_data = get_cached(cache_key)
+    if cached_data:
+        logger.info(f"CACHE HIT for key: {cache_key}")
+        return cached_data
+
+    logger.info(f"CACHE MISS for key: {cache_key}")
     api_key = get_api_key()
     url = f"{BASE_URL}/weather"
     params = {
@@ -273,11 +311,21 @@ def get_weather_by_coordinates(lat: float, lon: float) -> dict:
         "units": "metric"
     }
     raw_data = _execute_api_request(url, params)
-    return parse_current_weather(raw_data)
+    parsed_data = parse_current_weather(raw_data)
+
+    set_cached(cache_key, parsed_data)
+    return parsed_data
 
 
 def get_forecast_by_coordinates(lat: float, lon: float) -> dict:
-    """Fetch forecast data using latitude and longitude coordinates."""
+    """Fetch forecast data using latitude and longitude coordinates (with caching)."""
+    cache_key = make_coords_cache_key("forecast", lat, lon)
+    cached_data = get_cached(cache_key)
+    if cached_data:
+        logger.info(f"CACHE HIT for key: {cache_key}")
+        return cached_data
+
+    logger.info(f"CACHE MISS for key: {cache_key}")
     api_key = get_api_key()
     url = f"{BASE_URL}/forecast"
     params = {
@@ -287,4 +335,7 @@ def get_forecast_by_coordinates(lat: float, lon: float) -> dict:
         "units": "metric"
     }
     raw_data = _execute_api_request(url, params)
-    return parse_forecast(raw_data)
+    parsed_data = parse_forecast(raw_data)
+
+    set_cached(cache_key, parsed_data)
+    return parsed_data

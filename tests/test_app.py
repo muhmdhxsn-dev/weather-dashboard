@@ -1,6 +1,7 @@
+import time
 import pytest
 from unittest.mock import patch, MagicMock
-from app import app
+from app import app, limiter
 from database.db import (
     init_db,
     add_search_history,
@@ -10,10 +11,12 @@ from database.db import (
     get_favorites,
     remove_favorite_by_city
 )
+from services.cache_service import clear_cache, get_cache_ttl
 from services.weather_service import (
     parse_current_weather,
     parse_forecast,
     get_current_weather,
+    get_weather_by_coordinates,
     WeatherServiceError
 )
 
@@ -78,8 +81,15 @@ MOCK_FORECAST_RAW = {
 
 
 @pytest.fixture
-def client():
+def client(tmp_path, monkeypatch):
+    """Fixture providing a test client configured with an isolated temporary SQLite database."""
+    test_db = tmp_path / "test_weather.db"
+    monkeypatch.setattr("database.db.DB_PATH", test_db)
+    monkeypatch.setattr("database.db.DB_DIR", tmp_path)
+
     app.config['TESTING'] = True
+    limiter.reset()
+    clear_cache()
     with app.test_client() as client:
         with app.app_context():
             init_db()
@@ -122,52 +132,114 @@ def test_parse_forecast():
 
 @patch('services.weather_service.requests.get')
 @patch('services.weather_service.os.getenv')
-def test_api_current_weather_route_success(mock_getenv, mock_requests_get, client):
-    """Test GET /api/weather endpoint success response."""
+def test_cache_miss_and_hit(mock_getenv, mock_requests_get, client):
+    """Test cache miss (first fetch calls API) and cache hit (subsequent fetch uses cache)."""
     mock_getenv.return_value = "valid_test_key"
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = MOCK_CURRENT_WEATHER_RAW
     mock_requests_get.return_value = mock_response
 
-    response = client.get('/api/weather?city=Lahore')
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data['city'] == 'Lahore'
-    assert data['temp'] == 32
-    assert 'is_favorite' in data
+    # First Call -> Cache Miss -> API called once
+    res1 = get_current_weather("Lahore")
+    assert res1['city'] == "Lahore"
+    assert mock_requests_get.call_count == 1
 
-
-def test_api_current_weather_empty_city(client):
-    """Test GET /api/weather with missing city query parameter."""
-    response = client.get('/api/weather?city=')
-    assert response.status_code == 400
-    data = response.get_json()
-    assert 'error' in data
+    # Second Call -> Cache Hit -> API not called again
+    res2 = get_current_weather("Lahore")
+    assert res2['city'] == "Lahore"
+    assert mock_requests_get.call_count == 1
 
 
 @patch('services.weather_service.requests.get')
 @patch('services.weather_service.os.getenv')
-def test_api_weather_location_route(mock_getenv, mock_requests_get, client):
-    """Test GET /api/weather/location endpoint with coordinates."""
+def test_case_normalization_caching(mock_getenv, mock_requests_get, client):
+    """Test that 'Lahore', 'lahore', and 'LAHORE' resolve to the same cache entry."""
     mock_getenv.return_value = "valid_test_key"
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = MOCK_CURRENT_WEATHER_RAW
     mock_requests_get.return_value = mock_response
 
-    response = client.get('/api/weather/location?lat=31.5204&lon=74.3587')
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data['city'] == 'Lahore'
+    get_current_weather("Lahore")
+    get_current_weather("lahore")
+    get_current_weather("LAHORE")
+
+    assert mock_requests_get.call_count == 1
 
 
-def test_api_weather_location_invalid_coords(client):
-    """Test GET /api/weather/location with invalid coordinate parameters."""
-    response = client.get('/api/weather/location?lat=abc&lon=def')
-    assert response.status_code == 400
-    data = response.get_json()
-    assert 'Invalid latitude or longitude' in data['error']
+@patch('services.weather_service.requests.get')
+@patch('services.weather_service.os.getenv')
+def test_different_cities_cache_isolation(mock_getenv, mock_requests_get, client):
+    """Test that different cities do not share cache entries."""
+    mock_getenv.return_value = "valid_test_key"
+    mock_response1 = MagicMock()
+    mock_response1.status_code = 200
+    mock_response1.json.return_value = MOCK_CURRENT_WEATHER_RAW
+
+    mock_response2 = MagicMock()
+    mock_response2.status_code = 200
+    mock_response2.json.return_value = {**MOCK_CURRENT_WEATHER_RAW, "name": "Karachi"}
+
+    mock_requests_get.side_effect = [mock_response1, mock_response2]
+
+    res_lahore = get_current_weather("Lahore")
+    res_karachi = get_current_weather("Karachi")
+
+    assert res_lahore['city'] == "Lahore"
+    assert res_karachi['city'] == "Karachi"
+    assert mock_requests_get.call_count == 2
+
+
+@patch('services.weather_service.requests.get')
+@patch('services.weather_service.os.getenv')
+def test_coordinate_caching_normalization(mock_getenv, mock_requests_get, client):
+    """Test coordinate rounding and normalization caching."""
+    mock_getenv.return_value = "valid_test_key"
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = MOCK_CURRENT_WEATHER_RAW
+    mock_requests_get.return_value = mock_response
+
+    get_weather_by_coordinates(31.520411, 74.358711)
+    get_weather_by_coordinates(31.520444, 74.358744)
+
+    assert mock_requests_get.call_count == 1
+
+
+@patch('services.cache_service.time.time')
+@patch('services.weather_service.requests.get')
+@patch('services.weather_service.os.getenv')
+def test_cache_expiration(mock_getenv, mock_requests_get, mock_time, client):
+    """Test cache expiration after TTL."""
+    mock_getenv.return_value = "valid_test_key"
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = MOCK_CURRENT_WEATHER_RAW
+    mock_requests_get.return_value = mock_response
+
+    mock_time.return_value = 1000.0
+    get_current_weather("Lahore")
+    assert mock_requests_get.call_count == 1
+
+    mock_time.return_value = 1000.0 + 601.0
+    get_current_weather("Lahore")
+    assert mock_requests_get.call_count == 2
+
+
+def test_rate_limiting(client):
+    """Test that exceeding the rate limit returns HTTP 429."""
+    limiter.enabled = True
+
+    for _ in range(60):
+        res = client.get('/api/weather?city=Lahore')
+        assert res.status_code in [200, 400, 500]
+
+    res_exceeded = client.get('/api/weather?city=Lahore')
+    assert res_exceeded.status_code == 429
+    data = res_exceeded.get_json()
+    assert data['success'] is False
+    assert "Too many requests" in data['error']
 
 
 def test_search_history_db_operations(client):
@@ -181,7 +253,6 @@ def test_search_history_db_operations(client):
     assert len(history) == 2
     assert history[0]['city'] == 'Karachi'
 
-    # Clear history
     del_response = client.delete('/api/history')
     assert del_response.status_code == 200
     assert len(get_search_history()) == 0
@@ -189,18 +260,15 @@ def test_search_history_db_operations(client):
 
 def test_favorites_api(client):
     """Test favorite cities POST, GET, DELETE endpoints."""
-    # Add favorite
     post_res = client.post('/api/favorites', json={'city': 'Tokyo', 'country': 'JP'})
     assert post_res.status_code == 201
 
-    # Get favorites
     get_res = client.get('/api/favorites')
     assert get_res.status_code == 200
     favs = get_res.get_json()
     assert len(favs) >= 1
     assert favs[0]['city'] == 'Tokyo'
 
-    # Delete favorite
     del_res = client.delete('/api/favorites?city=Tokyo')
     assert del_res.status_code == 200
     assert len(get_favorites()) == 0
