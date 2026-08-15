@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nimbus | Production Weather Dashboard</title>
+    <meta name="description" content="A real-time, SaaS-grade weather dashboard offering current weather metrics, hourly temperature charts, 5-day forecasts, and saved locations.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Top App Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="brand">
+                    <div class="brand-icon">
+                        <i class="fa-solid fa-cloud-sun"></i>
+                    </div>
+                    <div class="brand-text">
+                        <span class="brand-name">Nimbus</span>
+                        <span class="brand-badge">SaaS</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search Form -->
+            <form id="search-form" class="search-form" role="search" aria-label="City Search">
+                <div class="search-input-group">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input 
+                        type="text" 
+                        id="city-input" 
+                        name="city" 
+                        placeholder="Search city (e.g. Lahore, London, Tokyo)..." 
+                        autocomplete="off" 
+                        aria-label="City name input"
+                        required
+                    >
+                    <button type="button" id="location-btn" class="btn-location" aria-label="Use My Location" title="Use current location">
+                        <i class="fa-solid fa-location-arrow"></i>
+                        <span class="location-btn-text">My Location</span>
+                    </button>
+                </div>
+                <button type="submit" id="search-btn" class="btn-primary">
+                    <span>Search</span>
+                </button>
+            </form>
+
+            <div class="header-right">
+                <button id="theme-toggle" class="btn-icon" aria-label="Toggle dark/light mode" title="Toggle theme">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Dashboard Container -->
+        <div class="dashboard-body">
+            <!-- Sidebar Panel -->
+            <aside class="sidebar">
+                <!-- Favorites Card -->
+                <section class="sidebar-card card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-heart text-danger"></i> Favorite Cities</h3>
+                    </div>
+                    <ul id="favorites-list" class="sidebar-list">
+                        <li class="empty-state">No favorite cities saved yet.</li>
+                    </ul>
+                </section>
+
+                <!-- Search History Card -->
+                <section class="sidebar-card card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-clock-rotate-left"></i> Recent Searches</h3>
+                        <button id="clear-history-btn" class="btn-text" aria-label="Clear search history" title="Clear history">Clear</button>
+                    </div>
+                    <ul id="history-list" class="sidebar-list">
+                        <li class="empty-state">No recent searches.</li>
+                    </ul>
+                </section>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="main-content" id="main-content">
+                <!-- System Notifications / Alert Banner -->
+                <div id="notification-banner" class="notification-banner hidden" role="alert">
+                    <i class="notification-icon fa-solid fa-triangle-exclamation"></i>
+                    <span id="notification-message"></span>
+                    <button id="notification-close" class="btn-close" aria-label="Close notification">&times;</button>
+                </div>
+
+                <!-- Skeleton Loader -->
+                <div id="skeleton-loader" class="skeleton-container hidden">
+                    <div class="skeleton-card skeleton-current"></div>
+                    <div class="skeleton-card skeleton-strip"></div>
+                    <div class="skeleton-card skeleton-chart"></div>
+                    <div class="skeleton-grid">
+                        <div class="skeleton-card"></div>
+                        <div class="skeleton-card"></div>
+                        <div class="skeleton-card"></div>
+                        <div class="skeleton-card"></div>
+                    </div>
+                </div>
+
+                <!-- Active Dashboard View -->
+                <div id="dashboard-view" class="dashboard-grid">
+                    <!-- Current Weather Hero Card -->
+                    <section class="card current-weather-card" id="weather-card">
+                        <div class="current-weather-header">
+                            <div class="location-details">
+                                <h1 id="cw-city">Lahore</h1>
+                                <span id="cw-country" class="country-badge">PK</span>
+                                <span id="cw-time" class="time-badge">6:12 AM</span>
+                            </div>
+                            <button id="fav-toggle-btn" class="btn-icon btn-fav" aria-label="Toggle favorite" title="Add to favorites">
+                                <i class="fa-regular fa-heart"></i>
+                            </button>
+                        </div>
+
+                        <div class="current-weather-body">
+                            <div class="main-temp-group">
+                                <div class="weather-icon-wrapper">
+                                    <img id="cw-icon" src="https://openweathermap.org/img/wn/01d@4x.png" alt="Weather icon" width="120" height="120">
+                                </div>
+                                <div class="temp-display">
+                                    <span id="cw-temp" class="temp-value">32</span><span class="temp-unit">°C</span>
+                                </div>
+                            </div>
+                            <div class="weather-condition-group">
+                                <h2 id="cw-condition">Clear Sky</h2>
+                                <p id="cw-description">Sunny with clear skies</p>
+                                <div class="feels-like-pill">
+                                    <span>Feels like <strong id="cw-feels">35°C</strong></span>
+                                    <span class="temp-range"><i class="fa-solid fa-arrow-down text-info"></i> <span id="cw-min">24°C</span> &nbsp; <i class="fa-solid fa-arrow-up text-danger"></i> <span id="cw-max">33°C</span></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="current-weather-footer">
+                            <div class="footer-stat">
+                                <i class="fa-solid fa-droplet"></i>
+                                <div>
+                                    <span class="stat-label">Humidity</span>
+                                    <strong id="cw-stat-humidity" class="stat-value">48%</strong>
+                                </div>
+                            </div>
+                            <div class="footer-stat">
+                                <i class="fa-solid fa-wind"></i>
+                                <div>
+                                    <span class="stat-label">Wind</span>
+                                    <strong id="cw-stat-wind" class="stat-value">12 km/h</strong>
+                                </div>
+                            </div>
+                            <div class="footer-stat">
+                                <i class="fa-solid fa-eye"></i>
+                                <div>
+                                    <span class="stat-label">Visibility</span>
+                                    <strong id="cw-stat-visibility" class="stat-value">10 km</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Hourly Forecast Strip -->
+                    <section class="card forecast-section">
+                        <div class="section-header">
+                            <h3><i class="fa-solid fa-clock"></i> Hourly Forecast (Next 24 Hours)</h3>
+                        </div>
+                        <div id="hourly-forecast-container" class="hourly-strip">
+                            <!-- Injected dynamically via JS -->
+                        </div>
+                    </section>
+
+                    <!-- Temperature Chart Card -->
+                    <section class="card chart-card">
+                        <div class="section-header">
+                            <h3><i class="fa-solid fa-chart-line"></i> Temperature Trend (°C)</h3>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="tempChart" aria-label="Hourly temperature forecast chart" role="img"></canvas>
+                        </div>
+                    </section>
+
+                    <!-- Detailed Weather Statistics Grid -->
+                    <section class="stats-grid-section">
+                        <div class="section-header">
+                            <h3><i class="fa-solid fa-gauge-high"></i> Weather Parameters</h3>
+                        </div>
+                        <div class="stats-grid">
+                            <!-- Humidity Card -->
+                            <div class="card stat-card">
+                                <div class="stat-card-icon bg-blue-subtle">
+                                    <i class="fa-solid fa-droplet text-blue"></i>
+                                </div>
+                                <div class="stat-card-info">
+                                    <span class="stat-title">Humidity</span>
+                                    <span id="card-stat-humidity" class="stat-number">48%</span>
+                                    <span class="stat-desc">Relative atmospheric moisture</span>
+                                </div>
+                            </div>
+
+                            <!-- Wind Card -->
+                            <div class="card stat-card">
+                                <div class="stat-card-icon bg-cyan-subtle">
+                                    <i class="fa-solid fa-wind text-cyan"></i>
+                                </div>
+                                <div class="stat-card-info">
+                                    <span class="stat-title">Wind Speed</span>
+                                    <span id="card-stat-wind" class="stat-number">12 km/h</span>
+                                    <span id="card-stat-wind-deg" class="stat-desc">Direction: 140° (SE)</span>
+                                </div>
+                            </div>
+
+                            <!-- Pressure Card -->
+                            <div class="card stat-card">
+                                <div class="stat-card-icon bg-purple-subtle">
+                                    <i class="fa-solid fa-gauge-simple-high text-purple"></i>
+                                </div>
+                                <div class="stat-card-info">
+                                    <span class="stat-title">Pressure</span>
+                                    <span id="card-stat-pressure" class="stat-number">1012 hPa</span>
+                                    <span class="stat-desc">Barometric sea-level pressure</span>
+                                </div>
+                            </div>
+
+                            <!-- Visibility Card -->
+                            <div class="card stat-card">
+                                <div class="stat-card-icon bg-emerald-subtle">
+                                    <i class="fa-solid fa-eye text-emerald"></i>
+                                </div>
+                                <div class="stat-card-info">
+                                    <span class="stat-title">Visibility</span>
+                                    <span id="card-stat-visibility" class="stat-number">10 km</span>
+                                    <span class="stat-desc">Horizontal sight distance</span>
+                                </div>
+                            </div>
+
+                            <!-- Cloudiness Card -->
+                            <div class="card stat-card">
+                                <div class="stat-card-icon bg-gray-subtle">
+                                    <i class="fa-solid fa-cloud text-gray"></i>
+                                </div>
+                                <div class="stat-card-info">
+                                    <span class="stat-title">Cloud Coverage</span>
+                                    <span id="card-stat-clouds" class="stat-number">20%</span>
+                                    <span class="stat-desc">Cloud sky proportion</span>
+                                </div>
+                            </div>
+
+                            <!-- Sunrise & Sunset Card -->
+                            <div class="card stat-card">
+                                <div class="stat-card-icon bg-amber-subtle">
+                                    <i class="fa-solid fa-sun text-amber"></i>
+                                </div>
+                                <div class="stat-card-info">
+                                    <span class="stat-title">Sunrise & Sunset</span>
+                                    <span class="stat-number sun-times">
+                                        <i class="fa-solid fa-sun-plant-wilt text-amber"></i> <span id="card-stat-sunrise">6:12 AM</span> &nbsp;
+                                        <i class="fa-solid fa-moon text-indigo"></i> <span id="card-stat-sunset">6:48 PM</span>
+                                    </span>
+                                    <span class="stat-desc">Solar cycle schedule</span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- 5-Day Daily Forecast Section -->
+                    <section class="card daily-forecast-section">
+                        <div class="section-header">
+                            <h3><i class="fa-solid fa-calendar-days"></i> 5-Day Weather Forecast</h3>
+                        </div>
+                        <div id="daily-forecast-container" class="daily-cards-grid">
+                            <!-- Injected dynamically via JS -->
+                        </div>
+                    </section>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Main JavaScript App Controller -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
