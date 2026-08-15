@@ -17,7 +17,7 @@ A modern, SaaS-style Weather Dashboard built with **Python 3.12+**, **Flask**, *
 
 ---
 
-## 🛠️ Technology Stack
+## 🛠️ Tech Stack
 
 * **Backend**: Python 3.12+, Flask, Requests, SQLite, python-dotenv
 * **Frontend**: HTML5, CSS3 (Vanilla design tokens & grid), Vanilla JavaScript (ES6+), Chart.js
@@ -29,7 +29,7 @@ A modern, SaaS-style Weather Dashboard built with **Python 3.12+**, **Flask**, *
 
 ### 1. Clone & Navigate
 ```bash
-git clone <repository-url>
+git clone https://github.com/your-username/weather-dashboard.git
 cd weather-dashboard
 ```
 
@@ -53,20 +53,31 @@ pip install -r requirements.txt
 ```
 
 ### 4. Configure Environment Variables
-Copy `.env.example` to `.env`:
+Create a local `.env` file in the root directory:
 ```bash
 copy .env.example .env
 ```
-Edit `.env` and set your OpenWeatherMap API key:
+Edit `.env` and set your configuration:
 ```env
-WEATHER_API_KEY=your_actual_openweather_api_key
+WEATHER_API_KEY=your_actual_api_key
+SECRET_KEY=your_actual_secret_key
+FLASK_ENV=development
 ```
+
+> [!IMPORTANT]  
+> The `.env` file contains your private API key and secrets. It **MUST NEVER** be committed to GitHub or public version control. It is already included in `.gitignore`.
 
 ### 5. Run the Application
 ```bash
 python app.py
 ```
 Open your browser at `http://127.0.0.1:5000`.
+
+---
+
+## ☁️ SQLite & Deployment Note
+
+SQLite is used for local development. Serverless deployment environments such as Vercel may not provide persistent local filesystem storage, so persistent favorites/search history may require a hosted database such as PostgreSQL in a future deployment phase.
 
 ---
 
@@ -77,9 +88,10 @@ weather-dashboard/
 │
 ├── app.py                  # Flask application routes and initialization
 ├── requirements.txt        # Python package dependencies
-├── .env                    # Environment variables (ignored by Git)
+├── vercel.json             # Vercel serverless deployment config
+├── .env                    # Environment variables (IGNORED BY GIT)
 ├── .env.example            # Environment template
-├── .gitignore              # Git ignore configuration
+├── .gitignore              # Git ignore rules
 ├── README.md               # Documentation
 │
 ├── database/
@@ -105,7 +117,7 @@ weather-dashboard/
 
 ## 📸 Screenshots
 
-*(Screenshots will be added upon final release)*
+*(Screenshots placeholder — preview images will be added here)*
 
 ---
 
@@ -115,3 +127,14 @@ Run all unit and integration tests using Pytest:
 ```bash
 pytest
 ```
+
+---
+
+## 🔮 Future Improvements
+
+- PostgreSQL for persistent production storage
+- API response caching
+- Rate limiting
+- User authentication
+- More detailed weather analytics
+- Improved deployment infrastructure

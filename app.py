@@ -26,7 +26,17 @@ from services.weather_service import (
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+
+# Configure Secret Key safely for local development and production
+flask_env = os.getenv("FLASK_ENV", "development")
+secret_key = os.getenv("SECRET_KEY")
+
+if not secret_key:
+    if flask_env == "production":
+        raise ValueError("SECRET_KEY environment variable is required in production mode.")
+    secret_key = "dev-secret-key-change-in-production"
+
+app.secret_key = secret_key
 
 # Ensure database tables exist on startup
 with app.app_context():
@@ -99,6 +109,8 @@ def api_weather_location():
     try:
         lat = float(lat_raw)
         lon = float(lon_raw)
+        if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+            return jsonify({"error": "Latitude or longitude values are out of range."}), 400
     except ValueError:
         return jsonify({"error": "Invalid latitude or longitude format."}), 400
 
@@ -126,6 +138,8 @@ def api_forecast_location():
     try:
         lat = float(lat_raw)
         lon = float(lon_raw)
+        if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+            return jsonify({"error": "Latitude or longitude values are out of range."}), 400
     except ValueError:
         return jsonify({"error": "Invalid latitude or longitude format."}), 400
 

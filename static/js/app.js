@@ -57,7 +57,7 @@ function initEventListeners() {
         searchForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const cityInput = document.getElementById('city-input');
-            const query = cityInput ? cityInput.value.strip ? cityInput.value.strip() : cityInput.value.trim() : '';
+            const query = cityInput ? cityInput.value.trim() : '';
             if (query) {
                 searchWeather(query);
             } else {
@@ -218,30 +218,30 @@ function displayCurrentWeather(data) {
     const iconImg = document.getElementById('cw-icon');
     if (iconImg) {
         iconImg.src = `https://openweathermap.org/img/wn/${data.icon}@4x.png`;
-        iconImg.alt = data.description;
+        iconImg.alt = data.description || 'Weather condition';
     }
 
-    document.getElementById('cw-temp').textContent = data.temp;
-    document.getElementById('cw-condition').textContent = data.condition;
-    document.getElementById('cw-description').textContent = data.description;
-    document.getElementById('cw-feels').textContent = `${data.feels_like}°C`;
-    document.getElementById('cw-min').textContent = `${data.temp_min}°C`;
-    document.getElementById('cw-max').textContent = `${data.temp_max}°C`;
+    document.getElementById('cw-temp').textContent = data.temp !== undefined ? data.temp : '--';
+    document.getElementById('cw-condition').textContent = data.condition || 'N/A';
+    document.getElementById('cw-description').textContent = data.description || '';
+    document.getElementById('cw-feels').textContent = data.feels_like !== undefined ? `${data.feels_like}°C` : 'N/A';
+    document.getElementById('cw-min').textContent = data.temp_min !== undefined ? `${data.temp_min}°C` : 'N/A';
+    document.getElementById('cw-max').textContent = data.temp_max !== undefined ? `${data.temp_max}°C` : 'N/A';
 
     // Footer stats
-    document.getElementById('cw-stat-humidity').textContent = `${data.humidity}%`;
-    document.getElementById('cw-stat-wind').textContent = `${data.wind_speed} km/h`;
-    document.getElementById('cw-stat-visibility').textContent = `${data.visibility} km`;
+    document.getElementById('cw-stat-humidity').textContent = data.humidity !== undefined ? `${data.humidity}%` : 'N/A';
+    document.getElementById('cw-stat-wind').textContent = data.wind_speed !== undefined ? `${data.wind_speed} km/h` : 'N/A';
+    document.getElementById('cw-stat-visibility').textContent = data.visibility !== undefined ? `${data.visibility} km` : 'N/A';
 
     // Grid stat cards
-    document.getElementById('card-stat-humidity').textContent = `${data.humidity}%`;
-    document.getElementById('card-stat-wind').textContent = `${data.wind_speed} km/h`;
-    document.getElementById('card-stat-wind-deg').textContent = `Direction: ${data.wind_deg}°`;
-    document.getElementById('card-stat-pressure').textContent = `${data.pressure} hPa`;
-    document.getElementById('card-stat-visibility').textContent = `${data.visibility} km`;
-    document.getElementById('card-stat-clouds').textContent = `${data.clouds}%`;
-    document.getElementById('card-stat-sunrise').textContent = data.sunrise;
-    document.getElementById('card-stat-sunset').textContent = data.sunset;
+    document.getElementById('card-stat-humidity').textContent = data.humidity !== undefined ? `${data.humidity}%` : 'N/A';
+    document.getElementById('card-stat-wind').textContent = data.wind_speed !== undefined ? `${data.wind_speed} km/h` : 'N/A';
+    document.getElementById('card-stat-wind-deg').textContent = data.wind_deg !== undefined ? `Direction: ${data.wind_deg}°` : 'N/A';
+    document.getElementById('card-stat-pressure').textContent = data.pressure !== undefined ? `${data.pressure} hPa` : 'N/A';
+    document.getElementById('card-stat-visibility').textContent = data.visibility !== undefined ? `${data.visibility} km` : 'N/A';
+    document.getElementById('card-stat-clouds').textContent = data.clouds !== undefined ? `${data.clouds}%` : 'N/A';
+    document.getElementById('card-stat-sunrise').textContent = data.sunrise || 'N/A';
+    document.getElementById('card-stat-sunset').textContent = data.sunset || 'N/A';
 
     // Update favorite heart icon state
     updateFavButtonUI(data.is_favorite);
@@ -259,14 +259,36 @@ function displayHourlyForecast(hourlyList) {
         return;
     }
 
-    container.innerHTML = hourlyList.map(item => `
-        <div class="hour-card">
-            <span class="hour-time">${item.time}</span>
-            <img src="https://openweathermap.org/img/wn/${item.icon}@2x.png" alt="${item.description}" width="48" height="48">
-            <span class="hour-temp">${item.temp}°C</span>
-            <span class="hour-pop"><i class="fa-solid fa-droplet"></i> ${item.pop}%</span>
-        </div>
-    `).join('');
+    container.innerHTML = '';
+    hourlyList.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'hour-card';
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'hour-time';
+        timeSpan.textContent = item.time;
+
+        const img = document.createElement('img');
+        img.src = `https://openweathermap.org/img/wn/${item.icon}@2x.png`;
+        img.alt = item.description || 'Hourly weather';
+        img.width = 48;
+        img.height = 48;
+
+        const tempSpan = document.createElement('span');
+        tempSpan.className = 'hour-temp';
+        tempSpan.textContent = `${item.temp}°C`;
+
+        const popSpan = document.createElement('span');
+        popSpan.className = 'hour-pop';
+        popSpan.innerHTML = `<i class="fa-solid fa-droplet"></i> ${item.pop}%`;
+
+        card.appendChild(timeSpan);
+        card.appendChild(img);
+        card.appendChild(tempSpan);
+        card.appendChild(popSpan);
+
+        container.appendChild(card);
+    });
 }
 
 /**
@@ -281,19 +303,56 @@ function displayDailyForecast(dailyList) {
         return;
     }
 
-    container.innerHTML = dailyList.map(day => `
-        <div class="daily-card">
-            <span class="day-name">${day.day}</span>
-            <span class="day-date">${day.date_short}</span>
-            <img src="https://openweathermap.org/img/wn/${day.icon}@2x.png" alt="${day.description}" width="54" height="54">
-            <span class="day-condition">${day.description}</span>
-            <div class="day-temp-group">
-                <span class="temp-max">${day.temp_max}°</span>
-                <span class="temp-min">${day.temp_min}°</span>
-            </div>
-            <span class="hour-pop"><i class="fa-solid fa-droplet"></i> ${day.pop}%</span>
-        </div>
-    `).join('');
+    container.innerHTML = '';
+    dailyList.forEach(day => {
+        const card = document.createElement('div');
+        card.className = 'daily-card';
+
+        const dayName = document.createElement('span');
+        dayName.className = 'day-name';
+        dayName.textContent = day.day;
+
+        const dayDate = document.createElement('span');
+        dayDate.className = 'day-date';
+        dayDate.textContent = day.date_short;
+
+        const img = document.createElement('img');
+        img.src = `https://openweathermap.org/img/wn/${day.icon}@2x.png`;
+        img.alt = day.description || 'Daily weather';
+        img.width = 54;
+        img.height = 54;
+
+        const dayCond = document.createElement('span');
+        dayCond.className = 'day-condition';
+        dayCond.textContent = day.description;
+
+        const tempGroup = document.createElement('div');
+        tempGroup.className = 'day-temp-group';
+
+        const tempMax = document.createElement('span');
+        tempMax.className = 'temp-max';
+        tempMax.textContent = `${day.temp_max}°`;
+
+        const tempMin = document.createElement('span');
+        tempMin.className = 'temp-min';
+        tempMin.textContent = `${day.temp_min}°`;
+
+        tempGroup.appendChild(tempMax);
+        tempGroup.appendChild(tempMin);
+
+        const popSpan = document.createElement('span');
+        popSpan.className = 'hour-pop';
+        popSpan.innerHTML = `<i class="fa-solid fa-droplet"></i> ${day.pop}%`;
+
+        card.appendChild(dayName);
+        card.appendChild(dayDate);
+        card.appendChild(img);
+        card.appendChild(dayCond);
+        card.appendChild(tempGroup);
+        card.appendChild(popSpan);
+
+        container.appendChild(card);
+    });
 }
 
 /**
@@ -302,6 +361,8 @@ function displayDailyForecast(dailyList) {
 function updateTemperatureChart(hourlyList) {
     const canvas = document.getElementById('tempChart');
     if (!canvas) return;
+
+    if (!hourlyList || hourlyList.length === 0) return;
 
     const labels = hourlyList.map(h => h.time);
     const temps = hourlyList.map(h => h.temp);
@@ -397,12 +458,28 @@ function renderSearchHistory(history) {
         return;
     }
 
-    container.innerHTML = history.map(item => `
-        <li class="sidebar-item" onclick="searchWeather('${item.city}')">
-            <span class="city-name">${item.city}</span>
-            <span class="country-code">${item.country}</span>
-        </li>
-    `).join('');
+    container.innerHTML = '';
+    history.forEach(item => {
+        const li = document.createElement('li');
+        li.className = 'sidebar-item';
+        
+        const citySpan = document.createElement('span');
+        citySpan.className = 'city-name';
+        citySpan.textContent = item.city;
+
+        const countrySpan = document.createElement('span');
+        countrySpan.className = 'country-code';
+        countrySpan.textContent = item.country;
+
+        li.appendChild(citySpan);
+        li.appendChild(countrySpan);
+
+        li.addEventListener('click', () => {
+            searchWeather(item.city);
+        });
+
+        container.appendChild(li);
+    });
 }
 
 async function clearSearchHistory() {
@@ -434,14 +511,31 @@ function renderFavorites(favorites) {
         return;
     }
 
-    container.innerHTML = favorites.map(fav => `
-        <li class="sidebar-item">
-            <span class="city-name" onclick="searchWeather('${fav.city}')">${fav.city} (${fav.country})</span>
-            <button class="btn-text text-danger" onclick="removeFavorite('${fav.city}', event)" title="Remove favorite">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-        </li>
-    `).join('');
+    container.innerHTML = '';
+    favorites.forEach(fav => {
+        const li = document.createElement('li');
+        li.className = 'sidebar-item';
+
+        const citySpan = document.createElement('span');
+        citySpan.className = 'city-name';
+        citySpan.textContent = `${fav.city} (${fav.country})`;
+        citySpan.addEventListener('click', () => {
+            searchWeather(fav.city);
+        });
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn-text text-danger';
+        delBtn.title = 'Remove favorite';
+        delBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        delBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeFavorite(fav.city);
+        });
+
+        li.appendChild(citySpan);
+        li.appendChild(delBtn);
+        container.appendChild(li);
+    });
 }
 
 async function toggleFavorite() {
@@ -453,7 +547,6 @@ async function toggleFavorite() {
 
     try {
         if (isFav) {
-            // Remove favorite
             const res = await fetch(`/api/favorites?city=${encodeURIComponent(city)}`, { method: 'DELETE' });
             if (res.ok) {
                 currentCityData.current.is_favorite = false;
@@ -462,7 +555,6 @@ async function toggleFavorite() {
                 showNotification(`Removed ${city} from favorites.`, 'info');
             }
         } else {
-            // Add favorite
             const res = await fetch('/api/favorites', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -480,8 +572,7 @@ async function toggleFavorite() {
     }
 }
 
-async function removeFavorite(city, event) {
-    if (event) event.stopPropagation();
+async function removeFavorite(city) {
     try {
         const res = await fetch(`/api/favorites?city=${encodeURIComponent(city)}`, { method: 'DELETE' });
         if (res.ok) {
