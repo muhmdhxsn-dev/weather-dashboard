@@ -84,6 +84,15 @@ function initEventListeners() {
         clearHistoryBtn.addEventListener('click', clearSearchHistory);
     }
 
+    // Mobile Menu / Sidebar Toggle Button
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const sidebar = document.getElementById('sidebar');
+    if (mobileMenuBtn && sidebar) {
+        mobileMenuBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('active');
+        });
+    }
+
     // Notification Banner Close Button
     const notifCloseBtn = document.getElementById('notification-close');
     if (notifCloseBtn) {
