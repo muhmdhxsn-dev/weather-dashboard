@@ -88,8 +88,15 @@ function initEventListeners() {
     const mobileMenuBtn = document.getElementById('mobile-menu-btn');
     const sidebar = document.getElementById('sidebar');
     if (mobileMenuBtn && sidebar) {
-        mobileMenuBtn.addEventListener('click', () => {
-            sidebar.classList.toggle('active');
+        mobileMenuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isActive = sidebar.classList.toggle('active');
+            mobileMenuBtn.classList.toggle('active', isActive);
+            
+            const icon = mobileMenuBtn.querySelector('i');
+            if (icon) {
+                icon.className = isActive ? 'fa-solid fa-xmark' : 'fa-solid fa-bars';
+            }
         });
     }
 
@@ -100,12 +107,24 @@ function initEventListeners() {
     }
 }
 
+function closeMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    if (sidebar) sidebar.classList.remove('active');
+    if (mobileMenuBtn) {
+        mobileMenuBtn.classList.remove('active');
+        const icon = mobileMenuBtn.querySelector('i');
+        if (icon) icon.className = 'fa-solid fa-bars';
+    }
+}
+
 /**
  * Primary Search Handler
  */
 async function searchWeather(cityName) {
     if (!cityName) return;
 
+    closeMobileSidebar();
     hideNotification();
     showLoading(true);
 

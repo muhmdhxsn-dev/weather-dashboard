@@ -965,11 +965,20 @@ body {
 
     .sidebar {
         display: none;
+        order: -1; /* Ensures drawer opens at top of dashboard directly below header */
+        width: 100%;
+        margin-bottom: 0.5rem;
     }
 
     .sidebar.active {
-        display: flex;
+        display: flex !important;
         animation: slideDown 0.3s ease;
+    }
+
+    #mobile-menu-btn.active {
+        background-color: var(--primary-subtle);
+        color: var(--primary-color);
+        border-color: var(--text-accent);
     }
 
     .current-weather-body {
