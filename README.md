@@ -1,4 +1,9 @@
-# Nimbus — Weather Dashboard
+# Nimbus — Production-Quality Weather Dashboard
+
+![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-3.0+-000000?logo=flask&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-12%20passed-success)
+![Deployment](https://img.shields.io/badge/Deployed-Vercel-black?logo=vercel)
 
 Nimbus is a production-oriented, full-stack weather dashboard built with **Python 3.12+**, **Flask**, **OpenWeatherMap API**, **SQLite**, **Vanilla JavaScript (ES6+)**, and **Chart.js**. It provides real-time current weather metrics, hourly temperature visualization charts, 5-day daily forecasts, browser geolocation lookup, and interactive favorites and search history management. Designed with a SaaS-inspired UI design system, it features configurable in-memory API caching, Flask-Limiter rate protection, theme toggling, and adaptive weather condition backgrounds.
 
